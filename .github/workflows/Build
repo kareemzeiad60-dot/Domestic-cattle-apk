@@ -1,0 +1,50 @@
+name: Build Android APK from ZIP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. سحب ملفات المستودع (بما فيها ملف zip)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. فك ضغط ملف الكود تلقائياً
+      - name: Unzip project files
+        run: |
+          unzip app.zip -d ./
+          # استبدل cattle-ai-mobile-ready-to-build.zip باسم الملف المضغوط لديك تماماً
+
+      # 3. إعداد Java
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 4. إعداد Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # 5. تثبيت المكتبات
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 6. بناء الـ APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 7. رفع الـ APK للتحميل
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
