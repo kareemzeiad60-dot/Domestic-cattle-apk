@@ -1,9 +1,9 @@
-name: Build Android APK from ZIP
+name: Build Expo Android APK from ZIP
 
 on:
   push:
     branches:
-      - main # غيّره إلى master إذا كان فرعك الرئيسي اسمه master
+      - main # غيّرها إلى master إذا كان اسم الفرع master
   workflow_dispatch:
 
 jobs:
@@ -15,56 +15,65 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. فك ضغط الملف والبحث الذكي عن مجلد Flutter الرئيسي
-      - name: Extract Project ZIP and Locate Root
+      # 2. فك ضغط ملف الـ ZIP واستخراج مشروع Expo
+      - name: Extract ZIP and Locate Expo Project
         run: |
           echo "Unzipping cattle-ai-mobile-ready-to-build.zip..."
           unzip -q cattle-ai-mobile-ready-to-build.zip -d temp_extracted
           
-          # البحث عن مكان وجود pubspec.yaml أينما كان
-          PUBSPEC_PATH=$(find temp_extracted -name "pubspec.yaml" -print -quit)
+          # البحث عن ملف package.json
+          PACKAGE_PATH=$(find temp_extracted -name "package.json" -not -path "*/node_modules/*" -print -quit)
           
-          if [ -z "$PUBSPEC_PATH" ]; then
-            echo "ERROR: Could not find pubspec.yaml inside the zip file!"
+          if [ -z "$PACKAGE_PATH" ]; then
+            echo "ERROR: Could not find package.json inside the zip file!"
             exit 1
           fi
           
-          # تحديد المجلد الذي يحتوي على pubspec.yaml
-          FLUTTER_DIR=$(dirname "$PUBSPEC_PATH")
-          echo "Found Flutter root at: $FLUTTER_DIR"
+          EXPO_DIR=$(dirname "$PACKAGE_PATH")
+          echo "Found Expo root at: $EXPO_DIR"
           
-          # نقل كل محتويات مجلد المشروع إلى المسار الرئيسي
-          cp -r "$FLUTTER_DIR"/* .
-          # نقل الملفات المخفية (إن وجدت مثل .dotfiles)
-          cp -r "$FLUTTER_DIR"/.[!.]* . 2>/dev/null || true
-          
-          # تنظيف المجلد المؤقت
+          # نقل كافة الملفات إلى المسار الرئيسي
+          cp -r "$EXPO_DIR"/* .
+          cp -r "$EXPO_DIR"/.[!.]* . 2>/dev/null || true
           rm -rf temp_extracted
 
-      # 3. إعداد Java
-      - name: Set up Java
+      # 3. إعداد بيئة Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 4. إعداد بيئة Java
+      - name: Set up Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 4. إعداد Flutter
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
+      # 5. إعداد بيئة Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      # 5. تثبيت حزم ومكتبات المشروع
-      - name: Install dependencies
-        run: flutter pub get
+      # 6. تثبيت مكتبات المشروع (NPM Dependencies)
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
 
-      # 6. بناء ملف الـ APK
-      - name: Build APK
-        run: flutter build apk --release
+      # 7. تثبيت أداة EAS CLI
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
-      # 7. رفع الـ APK ليصبح جاهزاً للتحميل
+      # 8. توليد مجلد Android وتجميع ملف الـ APK
+      - name: Build Android APK
+        run: |
+          npx expo prebuild --platform android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      # 9. رفع ملف الـ APK النهائي للتحميل
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cattle-ai-app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
