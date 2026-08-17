@@ -18,7 +18,7 @@ jobs:
       # 2. فك ضغط ملف الكود تلقائياً
       - name: Unzip project files
         run: |
-          unzip app.zip -d ./
+          unzip cattle-ai-mobile-ready-to-build.zip -d ./
           # استبدل cattle-ai-mobile-ready-to-build.zip باسم الملف المضغوط لديك تماماً
 
       # 3. إعداد Java
