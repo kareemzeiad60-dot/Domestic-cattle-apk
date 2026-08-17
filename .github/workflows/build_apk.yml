@@ -3,7 +3,7 @@ name: Build Android APK from ZIP
 on:
   push:
     branches:
-      - main # إذا كان اسم الفرع لديك master غيّره هنا إلى master
+      - main # غيّره إلى master إذا كان فرعك الرئيسي اسمه master
   workflow_dispatch:
 
 jobs:
@@ -15,24 +15,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. فك ضغط الملف الخاص بك ونقل المحتويات للمسار الرئيسي
-      - name: Extract Project ZIP
+      # 2. فك ضغط الملف والبحث الذكي عن مجلد Flutter الرئيسي
+      - name: Extract Project ZIP and Locate Root
         run: |
-          echo "Extracting cattle-ai-mobile-ready-to-build.zip..."
-          unzip -q cattle-ai-mobile-ready-to-build.zip -d extracted_app
+          echo "Unzipping cattle-ai-mobile-ready-to-build.zip..."
+          unzip -q cattle-ai-mobile-ready-to-build.zip -d temp_extracted
           
-          # نقل كل محتويات المجلد المفكوك إلى المسار الرئيسي
-          cp -r extracted_app/*/. . 2>/dev/null || cp -r extracted_app/. . 2>/dev/null
-          rm -rf extracted_app
+          # البحث عن مكان وجود pubspec.yaml أينما كان
+          PUBSPEC_PATH=$(find temp_extracted -name "pubspec.yaml" -print -quit)
+          
+          if [ -z "$PUBSPEC_PATH" ]; then
+            echo "ERROR: Could not find pubspec.yaml inside the zip file!"
+            exit 1
+          fi
+          
+          # تحديد المجلد الذي يحتوي على pubspec.yaml
+          FLUTTER_DIR=$(dirname "$PUBSPEC_PATH")
+          echo "Found Flutter root at: $FLUTTER_DIR"
+          
+          # نقل كل محتويات مجلد المشروع إلى المسار الرئيسي
+          cp -r "$FLUTTER_DIR"/* .
+          # نقل الملفات المخفية (إن وجدت مثل .dotfiles)
+          cp -r "$FLUTTER_DIR"/.[!.]* . 2>/dev/null || true
+          
+          # تنظيف المجلد المؤقت
+          rm -rf temp_extracted
 
-      # 3. إعداد بيئة Java
+      # 3. إعداد Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 4. إعداد بيئة Flutter
+      # 4. إعداد Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
