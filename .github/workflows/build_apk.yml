@@ -3,7 +3,7 @@ name: Build Android APK from ZIP
 on:
   push:
     branches:
-      - main
+      - main # إذا كان اسم الفرع لديك master غيّره هنا إلى master
   workflow_dispatch:
 
 jobs:
@@ -11,40 +11,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. سحب ملفات المستودع (بما فيها ملف zip)
+      # 1. سحب ملفات المستودع
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. فك ضغط ملف الكود تلقائياً
-      - name: Unzip project files
+      # 2. فك ضغط الملف الخاص بك ونقل المحتويات للمسار الرئيسي
+      - name: Extract Project ZIP
         run: |
-          unzip cattle-ai-mobile-ready-to-build.zip -d ./
-          # استبدل cattle-ai-mobile-ready-to-build.zip باسم الملف المضغوط لديك تماماً
+          echo "Extracting cattle-ai-mobile-ready-to-build.zip..."
+          unzip -q cattle-ai-mobile-ready-to-build.zip -d extracted_app
+          
+          # نقل كل محتويات المجلد المفكوك إلى المسار الرئيسي
+          cp -r extracted_app/*/. . 2>/dev/null || cp -r extracted_app/. . 2>/dev/null
+          rm -rf extracted_app
 
-      # 3. إعداد Java
+      # 3. إعداد بيئة Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 4. إعداد Flutter
+      # 4. إعداد بيئة Flutter
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      # 5. تثبيت المكتبات
+      # 5. تثبيت حزم ومكتبات المشروع
       - name: Install dependencies
         run: flutter pub get
 
-      # 6. بناء الـ APK
+      # 6. بناء ملف الـ APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 7. رفع الـ APK للتحميل
-      - name: Upload APK
+      # 7. رفع الـ APK ليصبح جاهزاً للتحميل
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: cattle-ai-app-release
           path: build/app/outputs/flutter-apk/app-release.apk
